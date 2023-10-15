@@ -2,5 +2,7 @@
  A docker registry that runs on cloudflare workers
 
  ## Installation
- > make docker-build
- > make docker-dev
+ ```bash
+ make docker-build
+ make docker-dev
+ ```
