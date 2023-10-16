@@ -3,7 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 
 import { ErrorCode, RegistryError } from './error';
 import { Env } from './env';
-import { createSessionId } from './session';
+import { createSessionId, getOrCreateSession, saveSession } from './session';
 import { isValidName, isValidReference } from './validators';
 
 export const v2 = new Hono<{ Bindings: Env }>();
@@ -58,15 +58,6 @@ v2.onError((err, c) => {
 	});
 
 	return response;
-});
-
-// end-1
-v2.get('/', async (c) => {
-	console.log("end-1");
-
-	c.status(200);
-
-	return c.body(null);
 });
 
 // end-2
@@ -127,31 +118,16 @@ v2.post('/:name/blobs/uploads/', async (c) => {
 
 	const sessionId = createSessionId();
 
+	const session = await getOrCreateSession(c.env, sessionId);
+
 	c.status(202);
 	c.res.headers.set('Location', `/v2/${name}/blobs/uploads/${sessionId}/`);
 
 	return c.body(null);
 });
 
-// end-5
-v2.patch('/:name/blobs/uploads/:reference/', async (c) => {
-	const { name, reference } = c.req.param();
-
-	if (!isValidName(name)) {
-		throw new RegistryError(ErrorCode.NameInvalid, 400);
-	}
-
-	if (!isValidReference(reference)) {
-		throw new RegistryError(ErrorCode.NameInvalid, 400, 'invalid reference');
-	}
-
-	c.status(202);
-
-	return c.body(null);
-});
-
-// end-6
-v2.put('/:name/blobs/uploads/:reference/', async (c) => {
+// end-5, end-6
+v2.on(['PUT', 'PATCH'], '/:name/blobs/uploads/:reference/', async (c) => {
 	const { name, reference } = c.req.param();
 
 	if (!isValidName(name)) {
@@ -164,9 +140,11 @@ v2.put('/:name/blobs/uploads/:reference/', async (c) => {
 
 	const { digest } = c.req.query();
 
-	if (!digest) {
-		throw new RegistryError(ErrorCode.DigestInvalid, 400);
-	}
+	const blob = await c.req.blob();
+
+	c.res.headers.set('Location', `/v2/${name}/blobs/uploads/${reference}/`);
+	c.res.headers.set('Range', `0-${blob.size}`);
+	c.status(202);
 
 	return c.body(null);
 });
